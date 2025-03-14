@@ -4,42 +4,43 @@ import sympy as sp
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Функция для решения арифметических задач
+# Функция для решения арифметических выражений
 def solve_arithmetic_problem(problem):
     try:
-        result = eval(problem)
+        result = eval(problem, {"__builtins__": {}}, {})
         return result
     except Exception as e:
         return f"Ошибка: {e}"
 
-# Функция для решения уравнений
+# Функция для решения уравнений и систем уравнений
 def solve_equation(equation):
     try:
-        # Преобразуем строку в математическое выражение
-        expr = sp.sympify(equation)
-        solutions = sp.solve(expr)
+        # Разбиваем систему уравнений, если есть ";"
+        equations = equation.split(";")
+        symbols = list(set(sp.symbols(" ".join(equations))))  # Определяем переменные
+        expressions = [sp.sympify(eq) for eq in equations]
+        
+        # Решаем систему уравнений
+        solutions = sp.solve(expressions, symbols)
         return solutions
     except Exception as e:
         return f"Ошибка: {e}"
 
-# Функция для построения графиков
+# Функция для построения графика
 def plot_graph(function):
     try:
-        # Преобразуем строку в выражение
-        x = sp.symbols('x')
+        x = sp.Symbol('x')
         expr = sp.sympify(function)
-        
-        # Преобразуем в функцию для matplotlib
         f = sp.lambdify(x, expr, 'numpy')
-        
-        # Генерация точек для графика
+
         x_vals = np.linspace(-10, 10, 400)
-        y_vals = f(x_vals)
-        
-        # Построение графика
+        y_vals = np.array([f(val) if np.isfinite(f(val)) else np.nan for val in x_vals])
+
         plt.figure(figsize=(6, 4))
-        plt.plot(x_vals, y_vals, label=f'y = {function}')
-        plt.title(f'График функции y = {function}')
+        plt.plot(x_vals, y_vals, label=f'y = {function}', color='blue')
+        plt.axhline(0, color='black', linewidth=0.5)
+        plt.axvline(0, color='black', linewidth=0.5)
+        plt.title(f'График y = {function}')
         plt.xlabel('x')
         plt.ylabel('y')
         plt.grid(True)
@@ -50,22 +51,38 @@ def plot_graph(function):
 
 # Функция для обработки ввода
 def on_calculate():
-    problem = entry.get()
-    if '=' in problem:  # Уравнение
-        result = solve_equation(problem)
-        result_label.config(text=f"Решение уравнения: {result}")
-    else:  # Арифметическая задача
-        result = solve_arithmetic_problem(problem)
+    problem = entry.get().strip()
+    
+    if not problem:
+        messagebox.showwarning("Предупреждение", "Введите выражение.")
+        return
+
+    if "=" in problem or ";" in problem:  # Уравнение или система уравнений
+        result = solve_equation(problem.replace("=", "-(") + ")")
+        result_label.config(text=f"Решение: {result}")
+    elif any(op in problem for op in ["+", "-", "*", "/", "^"]):  # Арифметика
+        result = solve_arithmetic_problem(problem.replace("^", "**"))
         result_label.config(text=f"Результат: {result}")
+    else:
+        result_label.config(text="Неизвестный формат ввода")
 
 # Функция для построения графика
 def on_plot():
-    function = entry.get()
+    function = entry.get().strip()
+    if not function:
+        messagebox.showwarning("Предупреждение", "Введите функцию для построения графика.")
+        return
     plot_graph(function)
+
+# Функция очистки ввода
+def clear_input():
+    entry.delete(0, tk.END)
+    result_label.config(text="")
 
 # Создание окна
 root = tk.Tk()
 root.title("Решатель математических задач")
+root.geometry("450x350")
 
 # Заголовок
 header = tk.Label(root, text="Введите математическое выражение", font=("Arial", 14))
@@ -76,15 +93,19 @@ entry = tk.Entry(root, font=("Arial", 14), width=30)
 entry.pack(pady=10)
 
 # Кнопка для вычисления
-calculate_button = tk.Button(root, text="Решить", font=("Arial", 14), command=on_calculate)
-calculate_button.pack(pady=10)
+calculate_button = tk.Button(root, text="Решить", font=("Arial", 12), command=on_calculate)
+calculate_button.pack(pady=5)
 
 # Кнопка для построения графика
-plot_button = tk.Button(root, text="Построить график", font=("Arial", 14), command=on_plot)
-plot_button.pack(pady=10)
+plot_button = tk.Button(root, text="Построить график", font=("Arial", 12), command=on_plot)
+plot_button.pack(pady=5)
+
+# Кнопка очистки ввода
+clear_button = tk.Button(root, text="Очистить", font=("Arial", 12), command=clear_input)
+clear_button.pack(pady=5)
 
 # Метка для отображения результатов
-result_label = tk.Label(root, text="", font=("Arial", 14))
+result_label = tk.Label(root, text="", font=("Arial", 12), wraplength=400, justify="center")
 result_label.pack(pady=10)
 
 # Запуск интерфейса
